@@ -41,6 +41,12 @@ public:
   * Calculate the total PID error.
   */
   double TotalError();
+
+  void step(double cte, double speed, double angle, double& steer_value);
+private:
+  bool first_step;
+  double prev_cte;
+  double sum_cte;
 };
 
 #endif /* PID_H */
