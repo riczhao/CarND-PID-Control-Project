@@ -28,13 +28,21 @@ std::string hasData(std::string s) {
   return "";
 }
 
+  double p[] = {1, 0, 0};
+  double dp[] = {1, 1, 1};
+  long long measure_time= 0.;
+  double best_err;
+
+  int p_i = 0;
+  int p_state = 0; // 0:check +dp 1:check -dp 
+
 int main()
 {
   uWS::Hub h;
 
   PID pid;
   // TODO: Initialize the pid variable.
-  pid.Init(1., 0, 0);
+  pid.Init(p[0], p[1], p[2]);
 
   h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -61,13 +69,77 @@ int main()
           pid.step(cte, speed, angle, steer_value);
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          if (fabs(cte) > 4. && !measure_time) {
+            std::string msg = "42[\"reset\",{}]";
+            ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            printf("%s:%d measure_time %lld\n", __func__, __LINE__, measure_time);
+            measure_time = pid.sum_time;
+            printf("%s:%d measure_time %lld\n", __func__, __LINE__, measure_time);
+            best_err = pid.TotalError();
+            std::cout << "p:" << p[0]<<"," <<p[1]<<","<<p[2] << " dp:" << dp[0]<<"," <<dp[1]<<","<<dp[2]<<std::endl;
+            std::cout << "p:" << p[0]<<"," <<p[1]<<","<<p[2]<<" err:"<<best_err
+               << " p_i:" << p_i <<" p_state:" << p_state << std::endl;
+            std::cout << "dp:" << dp[0]<<"," <<dp[1]<<","<<dp[2]<<std::endl;
+            p_state = 0;
+            p[p_i] += dp[p_i];
+            pid.Init(p[0], p[1], p[2]);
+            std::cout << "measure_time: "<<measure_time<<std::endl;
+          } if (measure_time&& measure_time <= pid.sum_time) {
+            double err = pid.TotalError();
+            std::cout << "p:" << p[0]<<"," <<p[1]<<","<<p[2]<<" err:"<<err
+               << " p_i:" << p_i <<" p_state:" << p_state << std::endl;
+            std::cout << "dp:" << dp[0]<<"," <<dp[1]<<","<<dp[2]<<std::endl;
+            switch (p_state) {
+            case 0:
+              if (err < best_err) {
+                std::cout << "p:" << p[0]<<"," <<p[1]<<","<<p[2] << " dp:" << dp[0]<<"," <<dp[1]<<","<<dp[2]<<std::endl;
+                best_err = err;
+                p_i++;
+                p_i = p_i > 2 ? 0 : p_i;
+                p_state = 0;
+                p[p_i] += dp[p_i];
+                if (best_err < 0.1) {
+                  dp[0] = dp[1] = dp[2] = 0.1;
+                  measure_time = 0.;
+                  p_i = p_state = 0;
+                }
+              } else {
+                p[p_i] -= 2*dp[p_i];
+                p_state = 1;
+              }
+              break;
+            case 1:
+              if (err < best_err) {
+                std::cout << "p:" << p[0]<<"," <<p[1]<<","<<p[2] << " dp:" << dp[0]<<"," <<dp[1]<<","<<dp[2]<<std::endl;
+                best_err = err;
+              } else {
+                p[p_i] += dp[p_i];
+                dp[p_i] *= 0.9;
+              }
+              p_i++;
+              p_i = p_i > 2 ? 0 : p_i;
+              p_state = 0;
+              p[p_i] += dp[p_i];
 
-          json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
-          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+              if (best_err < 0.1) {
+                dp[0] = dp[1] = dp[2] = 0.1;
+                measure_time = 0;
+                p_i = p_state = 0;
+              }
+ 
+              break;
+            }
+            std::string msg = "42[\"reset\",{}]";
+            ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            pid.Init(p[0], p[1], p[2]);
+          } else {
+            json msgJson;
+            msgJson["steering_angle"] = steer_value;
+            msgJson["throttle"] = 0.3;
+            auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+            std::cout << msg << std::endl;
+            ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          }
         }
       } else {
         // Manual driving

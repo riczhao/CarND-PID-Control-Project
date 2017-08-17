@@ -43,10 +43,13 @@ public:
   double TotalError();
 
   void step(double cte, double speed, double angle, double& steer_value);
+  long long sum_time;
 private:
   bool first_step;
   double prev_cte;
+  long long prev_timestamp;
   double sum_cte;
+  double err;
 };
 
 #endif /* PID_H */
