@@ -124,7 +124,7 @@ int main()
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
               if (!twiddle_speed)
                 pid_s.Init(p_s[0], p_s[1], p_s[2]);
-              if (!twiddle_speed)
+              if (!twiddle_drive)
                 pid_d.Init(p_d[0], p_d[1], p_d[2]);
           } else {
               json msgJson;
