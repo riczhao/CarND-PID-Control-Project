@@ -51,11 +51,12 @@ class Twiddle {
 public:
   PID *pid;
   double p[3];
-  double dp[3]
+  double dp[3];
+  double best_p[3], best_dp[3];
   double best_err;
   int max_steps;
-  Twiddle(double p1, double p2, double p3, double dp1, double dp2, double dp3);
-  void updateError(double cte, bool &need_reset);
+  Twiddle(PID *_pid, double p_[], double dp_[], int max_steps_);
+  void updateError(double cte, bool &need_reset, double &out_value);
 private:
   int state; // -1:no err received 0:+dp 1:-dp
   int p_i;
@@ -64,6 +65,13 @@ private:
     p_i %= 3;
   }
   void loop_start(void); /* start of the corresponding original twiddle loop */
+  void print_err(double err, char *prefix="");
+  void save_best_p(void) {
+    for (int i=0; i<3; i++) {
+      best_p[i] = p[i];
+      best_dp[i] = dp[i];
+    }
+  }
 };
 
 #endif /* PID_H */

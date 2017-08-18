@@ -1,4 +1,5 @@
 #include "PID.h"
+#include <iostream>
 #include <chrono>
 #include <stdio.h>
 
@@ -50,7 +51,7 @@ double PID::TotalError() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Twiddle:Twiddle(PID *_pid, double p_[], double dp_[], int max_steps_) {
+Twiddle::Twiddle(PID *_pid, double p_[], double dp_[], int max_steps_) {
   pid = _pid;
   for (int i=0; i<3; i++) {
     p[i] = p_[i];
@@ -70,35 +71,49 @@ void Twiddle::loop_start(void) {
    state = 0;
 }
 
-void Twiddle::updateError(double cte, bool &need_reset) {
-  pid->UpdateError(cte);
+void Twiddle::print_err(double err, char *prefix) {
+  cout << prefix << " err " << err <<
+    " p " << p[0] << "," << p[1] << "," << p[2] <<
+    " dp " << dp[0] << "," << dp[1] << "," << dp[2] <<
+    " p_i " << p_i << " state " << state << endl;
+}
+
+void Twiddle::updateError(double cte, bool &need_reset, double &out_value) {
+  out_value = pid->UpdateError(cte);
   need_reset = false;
   if (pid->steps < max_steps)
     return;
 
   double err = pid->TotalError();
+  print_err(err);
   need_reset = true;
 
   switch (state) {
   case -1:
     best_err = err;
+    print_err(err, "best");
+    save_best_p();
     p_i = 0;
     loop_start();
     break;
   case 0:
     if (err < best_err) {
       best_err = err;
+      print_err(err, "best");
+      save_best_p();
       next_p();
       loop_start();
     } else {
-      p[p_i] -= 2*dp[p_i_];
+      p[p_i] -= 2*dp[p_i];
       pid->Init(p[0], p[1], p[2]);
-      p_state = 1;
+      state = 1;
     }
     break;
   case 1:
     if (err < best_err) {
       best_err = err;
+      print_err(err, "best");
+      save_best_p();
     } else {
       p[p_i] += dp[p_i];
       dp[p_i] *= 0.9;
