@@ -41,6 +41,7 @@ private:
   bool first_step;
   double prev_cte;
   double sum_cte;
+  const int avg_win = 20;
   double err;
 };
 

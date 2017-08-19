@@ -2,6 +2,7 @@
 #include <iostream>
 #include <chrono>
 #include <stdio.h>
+#include <math.h>
 
 
 using namespace std;
@@ -37,7 +38,7 @@ double PID::UpdateError(double cte) {
   steps += 1;
   Sd = -Kd * (cte - prev_cte);
 
-  sum_cte += cte;
+  sum_cte = (avg_win * sum_cte + cte) / (avg_win + 1);
   Si = -Ki * sum_cte;
 
   err += cte * cte;
@@ -78,13 +79,18 @@ void Twiddle::print_err(double err, char *prefix) {
     " p_i " << p_i << " state " << state << endl;
 }
 
+extern bool twiddle_drive;
 void Twiddle::updateError(double cte, bool &need_reset, double &out_value) {
   out_value = pid->UpdateError(cte);
   need_reset = false;
-  if (pid->steps < max_steps)
-    return;
 
   double err = pid->TotalError();
+  /* off the road */
+  if (twiddle_drive && fabs(cte) > 4.)
+    err = 1E100;
+  else if (pid->steps < max_steps)
+    return;
+
   print_err(err);
   need_reset = true;
 

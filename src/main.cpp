@@ -28,36 +28,28 @@ std::string hasData(std::string s) {
   return "";
 }
 
-  double p[] = {1, 0, 0};
-  double dp[] = {1, 1, 1};
-  int measure_steps= 0;
-  double best_err;
-
-  int p_i = 0;
-  int p_state = 0; // 0:check +dp 1:check -dp 
+bool initialized = false;
 
 static PID pid_s;
 static double target_speed = 10;
 static bool twiddle_speed = false;
-static double p_s[] = {3.53705,0,0};
-static double dp_s[] = {0.430467,0.38742,0.38742};
-static Twiddle twiddle_s(&pid_s, p_s, dp_s, 1000);
+static double p_s[] = {4.48205,0.0164232,0.232212};
+static double dp_s[] = {0.0309031,0.0164232,0.0225284};
+static Twiddle twiddle_s(&pid_s, p_s, dp_s, 400);
 
 static PID pid_d;
-static bool twiddle_drive = true;
-static double p_d[] = {0,0,0};
-static double dp_d[] = {0.5,0.5,0.5};
+bool twiddle_drive = false;
+static double p_d[] = {1.17422,-0.00135816,-0.0723838};
+static double dp_d[] = {0.18,0.06561,0.09};
 static Twiddle twiddle_d(&pid_d, p_d, dp_d, 1000);
 static int max_steps_d;
 
 int main()
 {
   uWS::Hub h;
-
   PID pid;
 
   // TODO: Initialize the pid variable.
-  pid.Init(p[0], p[1], p[2]);
   pid_s.Init(p_s[0], p_s[1], p_s[2]);
   pid_d.Init(p_d[0], p_d[1], p_d[2]);
 
@@ -87,15 +79,20 @@ int main()
           double set_speed = 0;
           double err_speed = speed - target_speed;
           bool need_reset = false;
-          if (twiddle_speed) {
+          if (initialized && twiddle_speed) {
             twiddle_s.updateError(err_speed, need_reset, set_speed);
           } else {
             set_speed = pid_s.UpdateError(err_speed);
           }
 
-          if (twiddle_drive) {
+          if (initialized && twiddle_drive) {
             if (!max_steps_d) {
-              if (fabs(cte) > 4.) { /* at road boundary */
+              if (false/*pid_d.steps > 1000 && target_speed < 80*/) {
+                need_reset = true;
+                target_speed += 1;
+                pid_d.Init(p_d[0], p_d[1], p_d[2]);
+                printf("increase speed to %f\n", target_speed);
+              } else if (pid_d.steps > 10000 || fabs(cte) > 2.) { /* at road boundary */
                 max_steps_d = pid_d.steps;
                 twiddle_d = Twiddle(&pid_d, p_d, dp_d, max_steps_d);
                 need_reset = true;
@@ -105,7 +102,7 @@ int main()
               }
             } else {
               twiddle_d.updateError(cte, need_reset, steer_value);
-              if (twiddle_d.best_err < 0.2) {
+              if (twiddle_d.best_err < 0.3) {
                 for (int i=0; i<3; i++) {
                   p_d[i] = twiddle_d.best_p[i];
                 }
@@ -119,13 +116,14 @@ int main()
             steer_value = pid_d.UpdateError(cte);
           }
 
-          if (need_reset) {
+          if (!initialized || need_reset) {
               std::string msg = "42[\"reset\",{}]";
               ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
               if (!twiddle_speed)
                 pid_s.Init(p_s[0], p_s[1], p_s[2]);
               if (!twiddle_drive)
                 pid_d.Init(p_d[0], p_d[1], p_d[2]);
+              initialized = true;
           } else {
               json msgJson;
               msgJson["steering_angle"] = steer_value;
