@@ -1,0 +1,23 @@
+- Video for on lap https://youtu.be/hfJEJv-Q454  
+  It could run infinitely.
+
+- Describe the effect each of the P, I, D components had in your implementation.
+
+P is the major parameter to control steering angle. The angle is proportional to the off-target value.
+I accumulate CTEs, which will compensate car steering bias. It's usually very small. I moved to use moving average rather not the total CTEs square sum. It works very good on turns.
+D is differential factor which will reduce oscillation. It's usally small to.
+
+- Describe how the final hyperparameters were chosen.
+
+I created a twiddle class to tune both PIDs for speed and steering. The twiddle class is event driven, since the main.cpp is event driven.
+
+I first twiddle speed PID to 10mph. Let it drive straight forward until get edge of road to get max steps. It turned out the parameter works well on other speeds too, like 20mph and 30mph.
+
+Then I started twiddling steering PID. It turned out very unstable on speed > 20mph. I decided to use 10mph for the prject. Tuning Steps:
+1) use curent parameter to drive car, until the CTE > 3. Use current steps as max_steps.
+2) start tuning the parameter using Twiddle class, until the total error is < 0.2
+3) goto 1)
+
+The parameters will be print out once hit best err.
+
+I also added code to automatically increase speed, but it didn't work well.
